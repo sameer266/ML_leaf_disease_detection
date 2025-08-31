@@ -4,6 +4,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
+from treatment import treatment_suggestions
 
 # Load your trained model
 model = load_model("leaf_cnn_model.h5")
@@ -88,11 +89,10 @@ disease_mapping = {
 def process_image(img):
     IMG_SIZE = (64, 64)
     img = img.resize(IMG_SIZE)
-    img_array = np.array(img) / 255.0  # normalize
-    img_array = np.expand_dims(img_array, axis=0)  # add batch dimension
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
-# API route
 # API route
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
@@ -100,18 +100,22 @@ async def predict(file: UploadFile = File(...)):
         img = Image.open(file.file).convert("RGB")
         img_array = process_image(img)
         predictions = model.predict(img_array)
-        
+
         # Get model prediction
         predicted_class = class_names[np.argmax(predictions)]
         confidence = float(np.max(predictions))
-        
+
         # Convert to user-friendly response
         user_friendly = disease_mapping.get(predicted_class, predicted_class)
-        
+
+        # Get treatment if available
+        treatment = treatment_suggestions.get(predicted_class, "No treatment required (Healthy Leaf)")
+
         return JSONResponse({
             "status": "success",
             "prediction": user_friendly,
-            "confidence": round(confidence, 3)
+            "confidence": round(confidence, 3),
+            "treatment": treatment
         })
     except Exception as e:
         return JSONResponse({
